@@ -1,4 +1,4 @@
-﻿/* eslint-disable */
+/* eslint-disable */
 
 import { factory as jellyfinActions } from "./jellyfinactions";
 import { ajax } from "./fetchhelper";
@@ -25,6 +25,7 @@ import {
 
 import { commandHandler } from "./commandHandler";
 import { playbackManager } from "./playbackManager";
+import { createConnectionManager } from '../server/connection';
 
 window.castReceiverContext = cast.framework.CastReceiverContext.getInstance();
 window.mediaManager = window.castReceiverContext.getPlayerManager();
@@ -192,6 +193,37 @@ export function reportDeviceCapabilities() {
             contentType: 'application/json'
         });
     });
+}
+
+function internalProcessMessage(data) {
+    newProcessMessage(data);
+}
+
+export function newProcessMessage(data) {
+    if (data.forkSession) {
+        const {
+            serverAddress,
+            parentDeviceId,
+            parentAccessToken,
+            receiverName
+        } = data.forkSession;
+        createConnectionManager(serverAddress, parentAccessToken, parentDeviceId, receiverName);
+        return;
+    } else if (!window.connectionManager) {
+        broadcastToMessageBus({
+            type: 'error',
+            message: 'No session set!'
+        });
+        return;
+    }
+
+    // Season with updated data.
+    data.serverAddress = window.apiClient.serverAddress();
+    data.userId = window.apiClient.getCurrentUserId();
+    data.accessToken = window.apiClient.accessToken();
+
+    // Give back control to old code.
+    processMessage(data);
 }
 
 export function processMessage(data) {
@@ -385,7 +417,7 @@ window.castReceiverContext.addCustomMessageListener('urn:x-cast:com.connectsdk',
     // TODO set it somewhere better perhaps
     window.senderId = evt.senderId;
 
-    processMessage(data);
+    internalProcessMessage(data);
 });
 
 export function translateItems(data, options, items, method) {

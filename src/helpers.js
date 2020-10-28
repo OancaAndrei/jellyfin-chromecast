@@ -458,7 +458,7 @@ export function getStreamByIndex(streams, type, index) {
 
 export function getSecurityHeaders(accessToken, userId) {
 
-    var auth = 'Emby Client="Chromecast", Device="' + deviceInfo.deviceName + '", DeviceId="' + deviceInfo.deviceId + '", Version="' + deviceInfo.versionNumber + '"';
+    var auth = 'Emby Client="Chromecast", Device="' + deviceInfo.deviceName + '", DeviceId="' + deviceInfo.deviceId + '", Version="' + deviceInfo.appVersion + '"';
 
     if (userId) {
         auth += ', UserId="' + userId + '"';

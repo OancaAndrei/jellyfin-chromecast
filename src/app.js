@@ -1,12 +1,11 @@
+import { getDeviceId } from './server/deviceId';
 import "./components/maincontroller";
 
-let senders = cast.framework.CastReceiverContext.getInstance().getSenders();
-let id = senders.length !== 0 && senders[0].id ? senders[0].id : new Date().getTime();
-
 window.deviceInfo = {
-    deviceId: id,
-    deviceName: 'Google Cast',
-    versionNumber: '3.0.0'
+    appName: 'Jellyfin Chromecast',
+    appVersion: '4.0.0',
+    deviceId: getDeviceId(),
+    deviceName: 'Google Cast'
 };
 
 window.mediaElement = document.getElementById('video-player');

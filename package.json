@@ -12,11 +12,7 @@
   },
   "homepage": "https://jellyfin.org/",
   "dependencies": {
-    "clean-webpack-plugin": "^3.0.0",
-    "copy-webpack-plugin": "^5.1.1",
-    "file-loader": "^6.0.0",
-    "webpack": "4.42.1",
-    "webpack-cli": "^3.3.11"
+    "jellyfin-apiclient": "^1.4.1"
   },
   "scripts": {
     "prepare": "webpack --config webpack.config.js --mode=production",
@@ -25,7 +21,12 @@
     "lint": "eslint ./src/"
   },
   "devDependencies": {
+    "clean-webpack-plugin": "^3.0.0",
+    "copy-webpack-plugin": "^5.1.1",
     "eslint": "6.8.0",
-    "eslint-plugin-eslint-comments": "^3.1.2"
+    "eslint-plugin-eslint-comments": "^3.1.2",
+    "file-loader": "^6.0.0",
+    "webpack": "4.42.1",
+    "webpack-cli": "^3.3.11"
   }
 }
