@@ -3,8 +3,10 @@
  * @module components/syncPlay/settings/settings
  */
 
-import events from 'events';
-import appStorage from 'appStorage';
+import {
+    AppStorage as appStorage,
+    Events as events
+} from 'jellyfin-apiclient';
 
 /**
  * Class that manages SyncPlay settings.

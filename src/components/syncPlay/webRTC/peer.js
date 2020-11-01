@@ -41,7 +41,6 @@ class SyncPlayWebRTCPeer {
     initPeerConnection() {
         this.close();
 
-        const apiClient = window.connectionManager.currentApiClient();
 
         const configuration = {
             iceServers: []
@@ -118,7 +117,6 @@ class SyncPlayWebRTCPeer {
         const offer = await this.peerConnection.createOffer();
         await this.peerConnection.setLocalDescription(offer);
 
-        const apiClient = window.connectionManager.currentApiClient();
         apiClient.requestSyncPlayWebRTC({
             To: this.sessionId,
             Offer: JSON.stringify(offer)
@@ -132,7 +130,6 @@ class SyncPlayWebRTCPeer {
         const answer = await this.peerConnection.createAnswer();
         await this.peerConnection.setLocalDescription(answer);
 
-        const apiClient = window.connectionManager.currentApiClient();
         apiClient.requestSyncPlayWebRTC({
             To: this.sessionId,
             Answer: JSON.stringify(answer)

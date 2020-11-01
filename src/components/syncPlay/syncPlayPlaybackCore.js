@@ -3,12 +3,22 @@
  * @module components/syncPlay/syncPlayPlaybackCore
  */
 
-import events from 'events';
-import playbackManager from 'playbackManager';
-import * as syncPlayHelper from 'syncPlayHelper';
-import syncPlaySettings from 'syncPlaySettings';
-import toast from 'toast';
-import globalize from 'globalize';
+import { Events as events } from 'jellyfin-apiclient';
+import * as syncPlayHelper from './syncPlayHelper';
+import syncPlaySettings from './settings/settings';
+
+const playbackManager = {
+    currentTime: () => {
+        return 0;
+    },
+    getPlayerState: () => {
+        return {
+            PlayState: {
+                IsPaused: true
+            }
+        }
+    }
+};
 
 /**
  * Globals
@@ -184,7 +194,6 @@ class SyncPlayPlaybackCore {
         const state = playbackManager.getPlayerState();
         const playlistItemId = syncPlayManager.queueCore.getCurrentPlaylistItemId();
 
-        const apiClient = window.connectionManager.currentApiClient();
         apiClient.requestSyncPlayBuffering({
             When: now.toISOString(),
             PositionTicks: currentPositionTicks,
@@ -501,9 +510,7 @@ class SyncPlayPlaybackCore {
      */
     unpauseRequest(player) {
         if (!syncPlayManager.hasPlaybackAccess()) {
-            toast({
-                text: globalize.translate('MessageSyncPlayMissingPlaybackAccess')
-            });
+            // TODO: show some feedback?
             return;
         }
 
@@ -516,9 +523,7 @@ class SyncPlayPlaybackCore {
      */
     pauseRequest(player) {
         if (!syncPlayManager.hasPlaybackAccess()) {
-            toast({
-                text: globalize.translate('MessageSyncPlayMissingPlaybackAccess')
-            });
+            // TODO: show some feedback?
             return;
         }
 
@@ -531,9 +536,7 @@ class SyncPlayPlaybackCore {
      */
     seekRequest(PositionTicks, player) {
         if (!syncPlayManager.hasPlaybackAccess()) {
-            toast({
-                text: globalize.translate('MessageSyncPlayMissingPlaybackAccess')
-            });
+            // TODO: show some feedback?
             return;
         }
 

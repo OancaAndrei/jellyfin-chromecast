@@ -3,7 +3,18 @@
  * @module components/syncPlay/syncPlayQueueManager
  */
 
-import playbackManager from 'playbackManager';
+const playbackManager = {
+    currentTime: () => {
+        return 0;
+    },
+    getPlayerState: () => {
+        return {
+            PlayState: {
+                IsPaused: true
+            }
+        }
+    }
+};
 
 function findPlaylistIndex(playlistItemId, list) {
     for (let i = 0, length = list.length; i < length; i++) {
@@ -64,6 +75,7 @@ class SyncPlayQueueManager {
             return Promise.resolve();
         }
 
+        // TODO: replace this.
         return playbackManager.getItemsForPlayback(serverId, {
             Ids: itemIds.join(',')
         }).then((result) => {

@@ -1,23 +1,24 @@
 /**
- * Module that translates events from a player to SyncPlay events.
- * @module components/syncPlay/players/genericPlayer
+ * Module that translates events from the Cast player to SyncPlay events.
+ * @module components/syncPlay/players/localPlayer
  */
 
-import events from 'events';
-import playbackManager from 'playbackManager';
+import { Events as events } from 'jellyfin-apiclient';
+// import playbackManager from 'playbackManager';
+
+const playbackManager = {};
 
 /**
- * Class that translates events from a player to SyncPlay events.
+ * Class that translates events from the Cast player to SyncPlay events.
  */
-class SyncPlayGenericPlayer {
-    static type = 'generic';
-
+class SyncPlayLocalPlayer {
     constructor(player, syncPlayManager) {
         this.player = player;
         this.syncPlayManager = syncPlayManager;
         this.playbackCore = syncPlayManager.playbackCore;
         this.queueCore = syncPlayManager.queueCore;
         this.bound = false;
+        this.isPlayerActive = false;
     }
 
     /**
@@ -33,10 +34,53 @@ class SyncPlayGenericPlayer {
     }
 
     /**
-     * Binds to the player's events. Overriden.
+     * Binds to the player's events. Overrides parent method.
+     * @param {Object} player The player.
      */
     localBindToPlayer() {
-        throw new Error('Override this method!');
+        // FIXME: the following are needed because the 'events' module
+        // is changing the scope when executing the callbacks.
+        // For instance, calling 'onPlayerUnpause' from the wrong scope breaks things because 'this'
+        // points to 'player' (the event emitter) instead of pointing to the SyncPlayManager singleton.
+        const self = this;
+
+        this._onPlaybackStart = (player, state) => {
+            self.isPlayerActive = true;
+            self.onPlaybackStart(player, state);
+        };
+
+        this._onPlaybackStop = (stopInfo) => {
+            self.isPlayerActive = false;
+            self.onPlaybackStop(stopInfo);
+        };
+
+        this._onUnpause = () => {
+            self.onUnpause();
+        };
+
+        this._onPause = () => {
+            self.onPause();
+        };
+
+        this._onTimeUpdate = (e) => {
+            self.onTimeUpdate(e);
+        };
+
+        this._onPlaying = () => {
+            self.onPlaying();
+        };
+
+        this._onWaiting = (e) => {
+            self.onWaiting(e);
+        };
+
+        events.on(this.player, 'playbackstart', this._onPlaybackStart);
+        events.on(this.player, 'playbackstop', this._onPlaybackStop);
+        events.on(this.player, 'unpause', this._onUnpause);
+        events.on(this.player, 'pause', this._onPause);
+        events.on(this.player, 'timeupdate', this._onTimeUpdate);
+        events.on(this.player, 'playing', this._onPlaying);
+        events.on(this.player, 'waiting', this._onWaiting);
     }
 
     /**
@@ -52,10 +96,16 @@ class SyncPlayGenericPlayer {
     }
 
     /**
-     * Removes the bindings from the player's events. Overriden.
+     * Removes the bindings from the player's events. Overrides parent method.
      */
     localUnbindFromPlayer() {
-        throw new Error('Override this method!');
+        events.off(this.player, 'playbackstart', this._onPlaybackStart);
+        events.off(this.player, 'playbackstop', this._onPlaybackStop);
+        events.off(this.player, 'unpause', this._onPlayerUnpause);
+        events.off(this.player, 'pause', this._onPlayerPause);
+        events.off(this.player, 'timeupdate', this._onTimeUpdate);
+        events.off(this.player, 'playing', this._onPlaying);
+        events.off(this.player, 'waiting', this._onWaiting);
     }
 
     /**
@@ -120,7 +170,7 @@ class SyncPlayGenericPlayer {
      * @returns {boolean} Whether the player has some media loaded.
      */
     isPlaybackActive() {
-        return false;
+        return this.isPlayerActive;
     }
 
     /**
@@ -135,7 +185,6 @@ class SyncPlayGenericPlayer {
      * Overrides PlaybackManager's unpause method.
      */
     unpauseRequest(player) {
-        const apiClient = window.connectionManager.currentApiClient();
         apiClient.requestSyncPlayUnpause();
     }
 
@@ -143,7 +192,6 @@ class SyncPlayGenericPlayer {
      * Overrides PlaybackManager's pause method.
      */
     pauseRequest(player) {
-        const apiClient = window.connectionManager.currentApiClient();
         apiClient.requestSyncPlayPause();
         // Pause locally as well, to give the user some little control
         this.playbackCore.localPause(player);
@@ -153,52 +201,15 @@ class SyncPlayGenericPlayer {
      * Overrides PlaybackManager's seek method.
      */
     seekRequest(PositionTicks, player) {
-        const apiClient = window.connectionManager.currentApiClient();
         apiClient.requestSyncPlaySeek({
             PositionTicks: PositionTicks
         });
     }
 
     /**
-     * Overrides PlaybackManager's sendCommand method.
-     */
-    sendCommandRequest(cmd, player) {
-        const defaultAction = (cmd, player) => {
-            this.playbackCore.localSendCommand(cmd, player);
-        };
-
-        const ignoreCallback = (cmd, player) => {
-            // Do nothing
-        };
-
-        const SetRepeatModeCallback = (cmd, player) => {
-            this.queueCore.setRepeatModeRequest(cmd.Arguments.RepeatMode, player);
-        };
-
-        const SetShuffleQueueCallback = (cmd, player) => {
-            this.queueCore.setQueueShuffleModeRequest(cmd.Arguments.ShuffleMode, player);
-        };
-
-        // Commands override
-        const overrideCommands = {
-            PlaybackRate: ignoreCallback,
-            SetRepeatMode: SetRepeatModeCallback,
-            SetShuffleQueue: SetShuffleQueueCallback
-        };
-
-        const commandHandler = overrideCommands[cmd.Name];
-        if (typeof commandHandler === "function") {
-            commandHandler(cmd, player);
-        } else {
-            defaultAction(cmd, player);
-        }
-    }
-
-    /**
      * Overrides PlaybackManager's play method.
      */
     playRequest(options) {
-        const apiClient = window.connectionManager.currentApiClient();
         const sendPlayRequest = (items) => {
             const queue = items.map(item => item.Id);
             apiClient.requestSyncPlayPlay({
@@ -227,7 +238,6 @@ class SyncPlayGenericPlayer {
      * Overrides PlaybackManager's setCurrentPlaylistItem method.
      */
     setCurrentPlaylistItemRequest(playlistItemId, player) {
-        const apiClient = window.connectionManager.currentApiClient();
         apiClient.requestSyncPlaySetPlaylistItem({
             PlaylistItemId: playlistItemId
         });
@@ -237,7 +247,6 @@ class SyncPlayGenericPlayer {
      * Overrides PlaybackManager's removeFromPlaylist method.
      */
     removeFromPlaylistRequest(playlistItemIds, player) {
-        const apiClient = window.connectionManager.currentApiClient();
         apiClient.requestSyncPlayRemoveFromPlaylist({
             PlaylistItemIds: playlistItemIds
         });
@@ -247,7 +256,6 @@ class SyncPlayGenericPlayer {
      * Overrides PlaybackManager's movePlaylistItem method.
      */
     movePlaylistItemRequest(playlistItemId, newIndex, player) {
-        const apiClient = window.connectionManager.currentApiClient();
         apiClient.requestSyncPlayMovePlaylistItem({
             PlaylistItemId: playlistItemId,
             NewIndex: newIndex
@@ -258,7 +266,6 @@ class SyncPlayGenericPlayer {
      * Internal method used to emulate PlaybackManager's queue method.
      */
     genericQueueRequest(options, player, mode) {
-        const apiClient = window.connectionManager.currentApiClient();
         if (options.items) {
             playbackManager.translateItemsForPlayback(options.items, options).then((items) => {
                 const itemIds = items.map(item => item.Id);
@@ -304,7 +311,6 @@ class SyncPlayGenericPlayer {
      * Overrides PlaybackManager's nextTrack method.
      */
     nextTrackRequest(player) {
-        const apiClient = window.connectionManager.currentApiClient();
         apiClient.requestSyncPlayNextTrack({
             PlaylistItemId: this.queueCore.playQueueManager.getCurrentPlaylistItemId()
         });
@@ -314,7 +320,6 @@ class SyncPlayGenericPlayer {
      * Overrides PlaybackManager's previousTrack method.
      */
     previousTrackRequest(player) {
-        const apiClient = window.connectionManager.currentApiClient();
         apiClient.requestSyncPlayPreviousTrack({
             PlaylistItemId: this.queueCore.playQueueManager.getCurrentPlaylistItemId()
         });
@@ -324,7 +329,6 @@ class SyncPlayGenericPlayer {
      * Overrides PlaybackManager's setRepeatMode method.
      */
     setRepeatModeRequest(mode, player) {
-        const apiClient = window.connectionManager.currentApiClient();
         apiClient.requestSyncPlaySetRepeatMode({
             Mode: mode
         });
@@ -334,7 +338,6 @@ class SyncPlayGenericPlayer {
      * Overrides PlaybackManager's setQueueShuffleMode method.
      */
     setQueueShuffleModeRequest(mode, player) {
-        const apiClient = window.connectionManager.currentApiClient();
         apiClient.requestSyncPlaySetShuffleMode({
             Mode: mode
         });
@@ -347,11 +350,10 @@ class SyncPlayGenericPlayer {
         let mode = this.queueCore.playQueueManager.getShuffleMode();
         mode = mode === 'Sorted' ? 'Shuffle' : 'Sorted';
 
-        const apiClient = window.connectionManager.currentApiClient();
         apiClient.requestSyncPlaySetShuffleMode({
             Mode: mode
         });
     }
 }
 
-export default SyncPlayGenericPlayer;
+export default SyncPlayLocalPlayer;

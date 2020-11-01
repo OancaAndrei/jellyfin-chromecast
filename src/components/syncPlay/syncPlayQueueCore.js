@@ -3,13 +3,23 @@
  * @module components/syncPlay/syncPlayQueueCore
  */
 
-import events from 'events';
-import playbackManager from 'playbackManager';
-import * as syncPlayHelper from 'syncPlayHelper';
-import syncPlaySettings from 'syncPlaySettings';
-import SyncPlayQueueManager from 'syncPlayQueueManager';
-import toast from 'toast';
-import globalize from 'globalize';
+import { Events as events } from 'jellyfin-apiclient';
+import * as syncPlayHelper from './syncPlayHelper';
+import syncPlaySettings from './settings/settings';
+import SyncPlayQueueManager from './syncPlayQueueManager';
+
+const playbackManager = {
+    currentTime: () => {
+        return 0;
+    },
+    getPlayerState: () => {
+        return {
+            PlayState: {
+                IsPaused: true
+            }
+        }
+    }
+};
 
 var syncPlayManager;
 
@@ -109,7 +119,6 @@ class SyncPlayQueueCore {
      * Sends a SyncPlayBuffering request on playback start.
      */
     scheduleReadyRequestOnPlaybackStart(origin) {
-        const apiClient = window.connectionManager.currentApiClient();
         syncPlayHelper.waitForEventOnce(syncPlayManager, 'playbackstart', syncPlayHelper.WaitForEventDefaultTimeout, ['playbackerror']).then(() => {
             console.debug('SyncPlay scheduleReadyRequestOnPlaybackStart: local pause and notify server.');
             syncPlayManager.playbackCore.localPause();
@@ -130,9 +139,7 @@ class SyncPlayQueueCore {
         }).catch((error) => {
             console.error('Error while waiting for `playbackstart` event!', origin, error);
             if (!syncPlayManager.isSyncPlayEnabled()) {
-                toast({
-                    text: globalize.translate('MessageSyncPlayErrorMedia')
-                });
+                // TODO: do something?
             }
             syncPlayManager.haltGroupPlayback(apiClient);
             return;
@@ -179,9 +186,6 @@ class SyncPlayQueueCore {
             this.scheduleReadyRequestOnPlaybackStart('startPlayback');
         }).catch((error) => {
             console.error(error);
-            toast({
-                text: globalize.translate('MessageSyncPlayErrorMedia')
-            });
         });
     }
 
@@ -252,9 +256,7 @@ class SyncPlayQueueCore {
      */
     playRequest(options) {
         if (!syncPlayManager.hasPlaylistAccess()) {
-            toast({
-                text: globalize.translate('MessageSyncPlayMissingPlaylistAccess')
-            });
+            // TODO: show some feedback?
             return;
         }
 
@@ -267,9 +269,7 @@ class SyncPlayQueueCore {
      */
     setCurrentPlaylistItemRequest(playlistItemId, player) {
         if (!syncPlayManager.hasPlaybackAccess()) {
-            toast({
-                text: globalize.translate('MessageSyncPlayMissingPlaybackAccess')
-            });
+            // TODO: show some feedback?
             return;
         }
 
@@ -282,9 +282,7 @@ class SyncPlayQueueCore {
      */
     removeFromPlaylistRequest(playlistItemIds, player) {
         if (!syncPlayManager.hasPlaylistAccess()) {
-            toast({
-                text: globalize.translate('MessageSyncPlayMissingPlaylistAccess')
-            });
+            // TODO: show some feedback?
             return;
         }
 
@@ -297,9 +295,7 @@ class SyncPlayQueueCore {
      */
     movePlaylistItemRequest(playlistItemId, newIndex, player) {
         if (!syncPlayManager.hasPlaylistAccess()) {
-            toast({
-                text: globalize.translate('MessageSyncPlayMissingPlaylistAccess')
-            });
+            // TODO: show some feedback?
             return;
         }
 
@@ -312,9 +308,7 @@ class SyncPlayQueueCore {
      */
     queueRequest(options, player) {
         if (!syncPlayManager.hasPlaylistAccess()) {
-            toast({
-                text: globalize.translate('MessageSyncPlayMissingPlaylistAccess')
-            });
+            // TODO: show some feedback?
             return;
         }
 
@@ -327,9 +321,7 @@ class SyncPlayQueueCore {
      */
     queueNextRequest(options, player) {
         if (!syncPlayManager.hasPlaylistAccess()) {
-            toast({
-                text: globalize.translate('MessageSyncPlayMissingPlaylistAccess')
-            });
+            // TODO: show some feedback?
             return;
         }
 
@@ -342,9 +334,7 @@ class SyncPlayQueueCore {
      */
     nextTrackRequest(player) {
         if (!syncPlayManager.hasPlaybackAccess()) {
-            toast({
-                text: globalize.translate('MessageSyncPlayMissingPlaybackAccess')
-            });
+            // TODO: show some feedback?
             return;
         }
 
@@ -357,9 +347,7 @@ class SyncPlayQueueCore {
      */
     previousTrackRequest(player) {
         if (!syncPlayManager.hasPlaybackAccess()) {
-            toast({
-                text: globalize.translate('MessageSyncPlayMissingPlaybackAccess')
-            });
+            // TODO: show some feedback?
             return;
         }
 
@@ -372,9 +360,7 @@ class SyncPlayQueueCore {
      */
     setRepeatModeRequest(mode, player) {
         if (!syncPlayManager.hasPlaylistAccess()) {
-            toast({
-                text: globalize.translate('MessageSyncPlayMissingPlaylistAccess')
-            });
+            // TODO: show some feedback?
             return;
         }
 
@@ -387,9 +373,7 @@ class SyncPlayQueueCore {
      */
     setQueueShuffleModeRequest(mode, player) {
         if (!syncPlayManager.hasPlaylistAccess()) {
-            toast({
-                text: globalize.translate('MessageSyncPlayMissingPlaylistAccess')
-            });
+            // TODO: show some feedback?
             return;
         }
 
@@ -402,9 +386,7 @@ class SyncPlayQueueCore {
      */
     toggleQueueShuffleModeRequest(player) {
         if (!syncPlayManager.hasPlaylistAccess()) {
-            toast({
-                text: globalize.translate('MessageSyncPlayMissingPlaylistAccess')
-            });
+            // TODO: show some feedback?
             return;
         }
 

@@ -3,10 +3,10 @@
  * @module components/syncPlay/timeSync/core
  */
 
-import events from 'events';
-import syncPlaySettings from 'syncPlaySettings';
-import TimeSyncServer from 'timeSyncServer';
-import TimeSyncPeer from 'timeSyncPeer';
+import { Events as events } from 'jellyfin-apiclient';
+import syncPlaySettings from '../settings/settings';
+import TimeSyncServer from './server';
+import TimeSyncPeer from './peer';
 
 /**
  * Class that manages time syncing with several devices.

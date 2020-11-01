@@ -3,9 +3,9 @@
  * @module components/syncPlay/webRTC/core
  */
 
-import events from 'events';
-import syncPlaySettings from 'syncPlaySettings';
-import SyncPlayWebRTCPeer from 'syncPlayWebRTCPeer';
+import { Events as events } from 'jellyfin-apiclient';
+import syncPlaySettings from '../settings/settings';
+import SyncPlayWebRTCPeer from './peer';
 
 class SyncPlayWebRTCCore {
     constructor() {
@@ -33,7 +33,6 @@ class SyncPlayWebRTCCore {
         }
 
         this.enabled = true;
-        const apiClient = window.connectionManager.currentApiClient();
         apiClient.requestSyncPlayWebRTC({
             NewSession: true
         });
@@ -59,7 +58,6 @@ class SyncPlayWebRTCCore {
         this.enabled = false;
 
         if (notifyServer) {
-            const apiClient = window.connectionManager.currentApiClient();
             apiClient.requestSyncPlayWebRTC({
                 SessionLeaving: true
             });

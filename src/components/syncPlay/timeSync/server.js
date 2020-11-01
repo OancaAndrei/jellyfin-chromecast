@@ -3,7 +3,7 @@
  * @module components/syncPlay/timeSync/server
  */
 
-import TimeSync from 'timeSync';
+import TimeSync from './timeSync';
 
 /**
  * Class that manages time syncing with server.
@@ -17,7 +17,6 @@ class TimeSyncServer extends TimeSync {
      * Makes a ping request to the server.
      */
     requestPing() {
-        const apiClient = window.connectionManager.currentApiClient();
         const requestSent = new Date();
         let responseReceived;
         return apiClient.getServerTime().then((response) => {

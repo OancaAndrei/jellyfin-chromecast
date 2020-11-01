@@ -3,7 +3,7 @@
  * @module components/syncPlay/timeSync/peer
  */
 
-import TimeSync from 'timeSync';
+import TimeSync from './timeSync';
 
 /**
  * Class that manages time syncing with a peer.

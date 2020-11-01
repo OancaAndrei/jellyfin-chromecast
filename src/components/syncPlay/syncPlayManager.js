@@ -3,28 +3,22 @@
  * @module components/syncPlay/syncPlayManager
  */
 
-import events from 'events';
-import playbackManager from 'playbackManager';
-import * as syncPlayHelper from 'syncPlayHelper';
-import syncPlaySettings from 'syncPlaySettings';
-import syncPlayPlayerFactory from 'syncPlayPlayerFactory';
-import TimeSyncCore from 'timeSyncCore';
-import SyncPlayWebRTCCore from 'syncPlayWebRTCCore';
-import SyncPlayPlaybackCore from 'syncPlayPlaybackCore';
-import SyncPlayQueueCore from 'syncPlayQueueCore';
-import toast from 'toast';
-import globalize from 'globalize';
+import { Events as events } from 'jellyfin-apiclient';
+import * as syncPlayHelper from './syncPlayHelper';
+import syncPlaySettings from './settings/settings';
+import syncPlayPlayerFactory from './players/factory';
+import TimeSyncCore from './timeSync/core';
+import SyncPlayWebRTCCore from './webRTC/core';
+import SyncPlayPlaybackCore from './syncPlayPlaybackCore';
+import SyncPlayQueueCore from './syncPlayQueueCore';
+
+const playbackManager = {};
 
 /**
  * Class that manages the SyncPlay feature.
  */
 class SyncPlayManager {
     constructor() {
-        this.webRTCCore = new SyncPlayWebRTCCore(this);
-        this.timeSyncCore = new TimeSyncCore(this.webRTCCore);
-        this.playbackCore = new SyncPlayPlaybackCore(this);
-        this.queueCore = new SyncPlayQueueCore(this);
-
         this.syncMethod = 'None'; // used for stats
 
         this.groupInfo = null;
@@ -35,23 +29,27 @@ class SyncPlayManager {
         this.lastPlaybackCommand = null; // Last received playback command from server, tracks state of group
 
         this.currentPlayer = null;
-        this.defaultPlayerWrapper = syncPlayPlayerFactory.getGenericWrapper(this);
         this.playerWrapper = null;
+    }
 
-        events.on(playbackManager, 'playerchange', (event, newPlayer, newTarget, oldPlayer) => {
-            this.onPlayerChange(newPlayer, newTarget, oldPlayer);
-        });
+    init() {
+        this.webRTCCore = new SyncPlayWebRTCCore(this);
+        this.timeSyncCore = new TimeSyncCore(this.webRTCCore);
+        this.playbackCore = new SyncPlayPlaybackCore(this);
+        this.queueCore = new SyncPlayQueueCore(this);
+        this.defaultPlayerWrapper = syncPlayPlayerFactory.getGenericWrapper(this);
 
-        this.bindToPlayer(playbackManager.getCurrentPlayer());
+        // TODO: bind to player or player manager...
+        // this.bindToPlayer();
 
         events.on(this.timeSyncCore, 'time-sync-server-update', (event, timeOffset, ping) => {
             // Report ping
             if (this.syncEnabled) {
-                const apiClient = window.connectionManager.currentApiClient();
                 apiClient.sendSyncPlayPing({
                     Ping: ping
                 });
             }
+
         });
     }
 
@@ -135,9 +133,7 @@ class SyncPlayManager {
      * @returns {boolean} _true_ if the user is an administrator, _false_ otherwise.
      */
     isAdministrator() {
-        const apiClient = window.connectionManager.currentApiClient();
         const userId = this.stringToGuid(apiClient.getCurrentUserId());
-
         return this.isUserAdministrator(userId);
     }
 
@@ -159,9 +155,7 @@ class SyncPlayManager {
      * @returns {boolean} _true_ if the user has playback access, _false_ otherwise.
      */
     hasPlaybackAccess() {
-        const apiClient = window.connectionManager.currentApiClient();
         const userId = this.stringToGuid(apiClient.getCurrentUserId());
-
         return this.hasUserPlaybackAccess(userId);
     }
 
@@ -183,9 +177,7 @@ class SyncPlayManager {
      * @returns {boolean} _true_ if the user has playlist access, _false_ otherwise.
      */
     hasPlaylistAccess() {
-        const apiClient = window.connectionManager.currentApiClient();
         const userId = this.stringToGuid(apiClient.getCurrentUserId());
-
         return this.hasUserPlaylistAccess(userId);
     }
 
@@ -200,22 +192,16 @@ class SyncPlayManager {
                 this.queueCore.updatePlayQueue(apiClient, cmd.Data);
                 break;
             case 'UserJoined':
-                toast({
-                    text: globalize.translate('MessageSyncPlayUserJoined', cmd.Data)
-                });
+                // TODO: show fancy list of joined users if idle.
                 break;
             case 'UserLeft':
-                toast({
-                    text: globalize.translate('MessageSyncPlayUserLeft', cmd.Data)
-                });
+                // TODO: show fancy list of joined users if idle.
                 break;
             case 'GroupJoined':
                 this.enableSyncPlay(apiClient, cmd.Data, true);
                 break;
             case 'SyncPlayIsDisabled':
-                toast({
-                    text: globalize.translate('MessageSyncPlayIsDisabled')
-                });
+                // Do nothing.
                 break;
             case 'NotInGroup':
             case 'GroupLeft':
@@ -227,33 +213,24 @@ class SyncPlayManager {
                 break;
             case 'StateUpdate':
                 events.trigger(syncPlayManager, 'group-state-update', [cmd.Data.State, cmd.Data.Reason]);
-                console.debug('SyncPlay processGroupUpdate: StateUpdate', cmd.Data.State, cmd.Data.Reason);
                 break;
             case 'GroupDoesNotExist':
-                toast({
-                    text: globalize.translate('MessageSyncPlayGroupDoesNotExist')
-                });
+                // Do nothing.
                 break;
             case 'CreateGroupDenied':
-                toast({
-                    text: globalize.translate('MessageSyncPlayCreateGroupDenied')
-                });
+                // Do nothing.
                 break;
             case 'JoinGroupDenied':
-                toast({
-                    text: globalize.translate('MessageSyncPlayJoinGroupDenied')
-                });
+                // Do nothing.
                 break;
             case 'LibraryAccessDenied':
-                toast({
-                    text: globalize.translate('MessageSyncPlayLibraryAccessDenied')
-                });
+                // Do nothing.
                 break;
             case 'WebRTC':
                 this.webRTCCore.handleSignalingMessage(apiClient, cmd.Data);
                 break;
             default:
-                console.error('processSyncPlayGroupUpdate: command is not recognised: ' + cmd.Type);
+                console.debug(`SyncPlay processSyncPlayGroupUpdate: unknown command ${cmd.Type}.`);
                 break;
         }
     }
@@ -407,11 +384,7 @@ class SyncPlayManager {
             this.webRTCCore.enable();
         }
 
-        if (showMessage) {
-            toast({
-                text: globalize.translate('MessageSyncPlayEnabled')
-            });
-        }
+        // TODO: update with fancy view of users.
     }
 
     /**
@@ -433,11 +406,7 @@ class SyncPlayManager {
 
         this.webRTCCore.disable();
 
-        if (showMessage) {
-            toast({
-                text: globalize.translate('MessageSyncPlayDisabled')
-            });
-        }
+        // TODO: return to default view.
     }
 
     /**
