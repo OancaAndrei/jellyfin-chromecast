@@ -4,9 +4,6 @@
  */
 
 import { Events as events } from 'jellyfin-apiclient';
-// import playbackManager from 'playbackManager';
-
-const playbackManager = {};
 
 /**
  * Class that translates events from the Cast player to SyncPlay events.
@@ -181,178 +178,68 @@ class SyncPlayLocalPlayer {
         return false;
     }
 
-    /**
-     * Overrides PlaybackManager's unpause method.
-     */
-    unpauseRequest(player) {
-        apiClient.requestSyncPlayUnpause();
+    localUnpause() {
+
     }
 
-    /**
-     * Overrides PlaybackManager's pause method.
-     */
-    pauseRequest(player) {
-        apiClient.requestSyncPlayPause();
-        // Pause locally as well, to give the user some little control
-        this.playbackCore.localPause(player);
+    localPause() {
+
     }
 
-    /**
-     * Overrides PlaybackManager's seek method.
-     */
-    seekRequest(PositionTicks, player) {
-        apiClient.requestSyncPlaySeek({
-            PositionTicks: PositionTicks
-        });
+    localSeek(positionTicks) {
+
     }
 
-    /**
-     * Overrides PlaybackManager's play method.
-     */
-    playRequest(options) {
-        const sendPlayRequest = (items) => {
-            const queue = items.map(item => item.Id);
-            apiClient.requestSyncPlayPlay({
-                PlayingQueue: queue.join(','),
-                PlayingItemPosition: options.startIndex ? options.startIndex : 0,
-                StartPositionTicks: options.startPositionTicks ? options.startPositionTicks : 0
-            });
-        };
+    localStop() {
 
-        if (options.items) {
-            playbackManager.translateItemsForPlayback(options.items, options).then(sendPlayRequest);
-        } else {
-            if (!options.serverId) {
-                throw new Error('serverId required!');
-            }
-
-            playbackManager.getItemsForPlayback(options.serverId, {
-                Ids: options.ids.join(',')
-            }).then(function (result) {
-                playbackManager.translateItemsForPlayback(result.Items, options).then(sendPlayRequest);
-            });
-        }
     }
 
-    /**
-     * Overrides PlaybackManager's setCurrentPlaylistItem method.
-     */
-    setCurrentPlaylistItemRequest(playlistItemId, player) {
-        apiClient.requestSyncPlaySetPlaylistItem({
-            PlaylistItemId: playlistItemId
-        });
+    localSendCommand(cmd) {
+
     }
 
-    /**
-     * Overrides PlaybackManager's removeFromPlaylist method.
-     */
-    removeFromPlaylistRequest(playlistItemIds, player) {
-        apiClient.requestSyncPlayRemoveFromPlaylist({
-            PlaylistItemIds: playlistItemIds
-        });
+    localPlay(options) {
+
     }
 
-    /**
-     * Overrides PlaybackManager's movePlaylistItem method.
-     */
-    movePlaylistItemRequest(playlistItemId, newIndex, player) {
-        apiClient.requestSyncPlayMovePlaylistItem({
-            PlaylistItemId: playlistItemId,
-            NewIndex: newIndex
-        });
+    localSetCurrentPlaylistItem(playlistItemId) {
+
     }
 
-    /**
-     * Internal method used to emulate PlaybackManager's queue method.
-     */
-    genericQueueRequest(options, player, mode) {
-        if (options.items) {
-            playbackManager.translateItemsForPlayback(options.items, options).then((items) => {
-                const itemIds = items.map(item => item.Id);
-                apiClient.requestSyncPlayQueue({
-                    ItemIds: itemIds.join(','),
-                    Mode: mode
-                });
-            });
-        } else {
-            if (!options.serverId) {
-                throw new Error('serverId required!');
-            }
+    localRemoveFromPlaylist(playlistItemIds) {
 
-            playbackManager.getItemsForPlayback(options.serverId, {
-                Ids: options.ids.join(',')
-            }).then(function (result) {
-                playbackManager.translateItemsForPlayback(result.Items, options).then((items) => {
-                    const itemIds = items.map(item => item.Id);
-                    apiClient.requestSyncPlayQueue({
-                        ItemIds: itemIds.join(','),
-                        Mode: mode
-                    });
-                });
-            });
-        }
     }
 
-    /**
-     * Overrides PlaybackManager's queue method.
-     */
-    queueRequest(options, player) {
-        this.queueCore.genericQueueRequest(options, player, 'default');
+    localMovePlaylistItem(playlistItemId, newIndex) {
+
     }
 
-    /**
-     * Overrides PlaybackManager's queueNext method.
-     */
-    queueNextRequest(options, player) {
-        this.queueCore.genericQueueRequest(options, player, 'next');
+    localQueue(options) {
+
     }
 
-    /**
-     * Overrides PlaybackManager's nextTrack method.
-     */
-    nextTrackRequest(player) {
-        apiClient.requestSyncPlayNextTrack({
-            PlaylistItemId: this.queueCore.playQueueManager.getCurrentPlaylistItemId()
-        });
+    localQueueNext(options) {
+
     }
 
-    /**
-     * Overrides PlaybackManager's previousTrack method.
-     */
-    previousTrackRequest(player) {
-        apiClient.requestSyncPlayPreviousTrack({
-            PlaylistItemId: this.queueCore.playQueueManager.getCurrentPlaylistItemId()
-        });
+    localNextTrack() {
+
     }
 
-    /**
-     * Overrides PlaybackManager's setRepeatMode method.
-     */
-    setRepeatModeRequest(mode, player) {
-        apiClient.requestSyncPlaySetRepeatMode({
-            Mode: mode
-        });
+    localPreviousTrack() {
+
     }
 
-    /**
-     * Overrides PlaybackManager's setQueueShuffleMode method.
-     */
-    setQueueShuffleModeRequest(mode, player) {
-        apiClient.requestSyncPlaySetShuffleMode({
-            Mode: mode
-        });
+    localSetRepeatMode(value) {
+
     }
 
-    /**
-     * Overrides PlaybackManager's toggleQueueShuffleMode method.
-     */
-    toggleQueueShuffleModeRequest(player) {
-        let mode = this.queueCore.playQueueManager.getShuffleMode();
-        mode = mode === 'Sorted' ? 'Shuffle' : 'Sorted';
+    localSetQueueShuffleMode(value) {
 
-        apiClient.requestSyncPlaySetShuffleMode({
-            Mode: mode
-        });
+    }
+
+    localToggleQueueShuffleMode() {
+
     }
 }
 

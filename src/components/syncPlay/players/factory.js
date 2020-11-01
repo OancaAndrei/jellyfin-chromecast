@@ -10,15 +10,46 @@ import SyncPlayLocalPlayer from './localPlayer';
  */
 class SyncPlayPlayerFactory {
     constructor() {
-        // Do nothing.
+        this.wrappers = {};
     }
 
     /**
-     * Gets a generic player wrapper.
-     * @param {SyncPlayManager} syncPlayManager The SyncPlay manager.
-     * @returns The generic player wrapper.
+     * Registers a wrapper to the list of players that can be managed.
+     * @param {SyncPlayGenericPlayer} wrapperClass The wrapper to register.
      */
-    getGenericWrapper(syncPlayManager) {
+    registerWrapper(wrapperClass) {
+        console.debug('SyncPlay WrapperFactory registerWrapper:', wrapperClass.type);
+        this.wrappers[wrapperClass.type] = wrapperClass;
+    }
+
+    /**
+     * Gets a player wrapper that manages the given player. Default wrapper is used for unknown players.
+     * @param {Object} player The player to handle.
+     * @param {SyncPlayManager} syncPlayManager The SyncPlay manager.
+     * @returns The player wrapper.
+     */
+    getWrapper(player, syncPlayManager) {
+        if (!player) {
+            console.debug('SyncPlay WrapperFactory getWrapper: using default wrapper.');
+            return this.getDefaultWrapper(syncPlayManager);
+        }
+
+        console.debug('SyncPlay WrapperFactory getWrapper:', player.id);
+        const Wrapper = this.wrappers[player.id];
+        if (Wrapper) {
+            return new Wrapper(player, syncPlayManager);
+        }
+
+        console.debug(`SyncPlay WrapperFactory getWrapper: unknown player ${player.id}, using default wrapper.`);
+        return this.getDefaultWrapper(syncPlayManager);
+    }
+
+    /**
+     * Gets the default player wrapper.
+     * @param {SyncPlayManager} syncPlayManager The SyncPlay manager.
+     * @returns The default player wrapper.
+     */
+    getDefaultWrapper(syncPlayManager) {
         return new SyncPlayLocalPlayer(null, syncPlayManager);
     }
 }

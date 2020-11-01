@@ -27,9 +27,8 @@ var syncPlayManager;
  * Class that manages the queue of SyncPlay.
  */
 class SyncPlayQueueCore {
-    constructor(_syncPlayManager) {
-        // FIXME: kinda ugly but does its job (it avoids circular dependencies)
-        syncPlayManager = _syncPlayManager;
+    constructor(syncPlayManager) {
+        this.manager = syncPlayManager;
         this.playQueueManager = new SyncPlayQueueManager();
     }
 
@@ -57,14 +56,17 @@ class SyncPlayQueueCore {
             }
 
             // Ignore if remote self-managed player
-            if (syncPlayManager.isRemote()) {
+            if (this.manager.isRemote()) {
+                console.warn('SyncPlay updatePlayQueue: remote player has own SyncPlay manager.');
                 return;
             }
 
+            const playerWrapper = this.manager.getPlayerWrapper();
+
             switch (newPlayQueue.Reason) {
                 case 'NewPlaylist': {
-                    if (!syncPlayManager.isFollowingGroupPlayback()) {
-                        syncPlayManager.followGroupPlayback(apiClient).then(() => {
+                    if (!this.manager.isFollowingGroupPlayback()) {
+                        this.manager.followGroupPlayback(apiClient).then(() => {
                             this.startPlayback(apiClient);
                         });
                     } else {
@@ -101,10 +103,10 @@ class SyncPlayQueueCore {
                     break;
                 }
                 case 'RepeatMode':
-                    this.localSetRepeatMode(this.playQueueManager.getRepeatMode());
+                    playerWrapper.localSetRepeatMode(this.playQueueManager.getRepeatMode());
                     break;
                 case 'ShuffleMode':
-                    this.localSetQueueShuffleMode(this.playQueueManager.getShuffleMode());
+                    playerWrapper.localSetQueueShuffleMode(this.playQueueManager.getShuffleMode());
                     break;
                 default:
                     console.error('SyncPlay updatePlayQueue: unknown reason for update:', newPlayQueue.Reason);
@@ -119,12 +121,12 @@ class SyncPlayQueueCore {
      * Sends a SyncPlayBuffering request on playback start.
      */
     scheduleReadyRequestOnPlaybackStart(origin) {
-        syncPlayHelper.waitForEventOnce(syncPlayManager, 'playbackstart', syncPlayHelper.WaitForEventDefaultTimeout, ['playbackerror']).then(() => {
+        syncPlayHelper.waitForEventOnce(this.manager, 'playbackstart', syncPlayHelper.WaitForEventDefaultTimeout, ['playbackerror']).then(() => {
             console.debug('SyncPlay scheduleReadyRequestOnPlaybackStart: local pause and notify server.');
-            syncPlayManager.playbackCore.localPause();
+            this.manager.playbackCore.localPause();
 
             const currentTime = new Date();
-            const now = syncPlayManager.timeSyncCore.localDateToRemote(currentTime);
+            const now = this.manager.timeSyncCore.localDateToRemote(currentTime);
             const currentPosition = playbackManager.currentTime();
             const currentPositionTicks = Math.round(currentPosition) * syncPlayHelper.TicksPerMillisecond;
             const state = playbackManager.getPlayerState();
@@ -141,7 +143,7 @@ class SyncPlayQueueCore {
             if (!syncPlayManager.isSyncPlayEnabled()) {
                 // TODO: do something?
             }
-            syncPlayManager.haltGroupPlayback(apiClient);
+            this.manager.haltGroupPlayback(apiClient);
             return;
         });
     }
@@ -151,29 +153,36 @@ class SyncPlayQueueCore {
      * @param {Object} apiClient The ApiClient.
      */
     startPlayback(apiClient) {
+        // Ignore command when client is not following playback
+        if (!this.manager.isFollowingGroupPlayback()) {
+            console.debug('SyncPlay startPlayback: ignoring, not following playback.');
+            return Promise.reject();
+        }
+
         if (this.isPlaylistEmpty()) {
             console.debug('SyncPlay startPlayback: empty playlist.');
             return;
         }
 
         // Estimate start position ticks from last playback command, if available
-        const playbackCommand = syncPlayManager.getLastPlaybackCommand();
+        const playbackCommand = this.manager.getLastPlaybackCommand();
         const lastQueueUpdateDate = this.playQueueManager.getLastUpdate();
         let startPositionTicks = 0;
 
         if (playbackCommand && playbackCommand.EmittedAt.getTime() >= lastQueueUpdateDate.getTime()) {
             // Prefer playback commands as they're more frequent (and also because playback position is PlaybackCore's concern)
-            startPositionTicks = syncPlayManager.playbackCore.estimateCurrentTicks(playbackCommand.PositionTicks, playbackCommand.When);
+            startPositionTicks = this.manager.playbackCore.estimateCurrentTicks(playbackCommand.PositionTicks, playbackCommand.When);
         } else {
             // A PlayQueueUpdate is emited only on queue changes so it's less reliable for playback position syncing
             const oldStartPositionTicks = this.playQueueManager.getStartPositionTicks();
-            startPositionTicks = syncPlayManager.playbackCore.estimateCurrentTicks(oldStartPositionTicks, lastQueueUpdateDate);
+            startPositionTicks = this.manager.playbackCore.estimateCurrentTicks(oldStartPositionTicks, lastQueueUpdateDate);
         }
 
         const serverId = apiClient.serverInfo().Id;
         const p2pTracker = syncPlaySettings.get('p2pTracker');
 
-        this.localPlay({
+        const playerWrapper = this.manager.getPlayerWrapper();
+        playerWrapper.localPlay({
             ids: this.playQueueManager.getPlaylistAsItemIds(),
             startPositionTicks: startPositionTicks,
             startIndex: this.playQueueManager.getCurrentPlaylistIndex(),
@@ -190,353 +199,19 @@ class SyncPlayQueueCore {
     }
 
     /**
-     * Overrides some PlaybackManager's methods to intercept playback commands.
-     */
-    injectPlaybackManager() {
-        // Save local callbacks
-        playbackManager._localPlayQueueManager = playbackManager._playQueueManager;
-
-        playbackManager._localPlay = playbackManager.play;
-        playbackManager._localSetCurrentPlaylistItem = playbackManager.setCurrentPlaylistItem;
-        playbackManager._localRemoveFromPlaylist = playbackManager.removeFromPlaylist;
-        playbackManager._localMovePlaylistItem = playbackManager.movePlaylistItem;
-        playbackManager._localQueue = playbackManager.queue;
-        playbackManager._localQueueNext = playbackManager.queueNext;
-
-        playbackManager._localNextTrack = playbackManager.nextTrack;
-        playbackManager._localPreviousTrack = playbackManager.previousTrack;
-
-        playbackManager._localSetRepeatMode = playbackManager.setRepeatMode;
-        playbackManager._localSetQueueShuffleMode = playbackManager.setQueueShuffleMode;
-        playbackManager._localToggleQueueShuffleMode = playbackManager.toggleQueueShuffleMode;
-
-        // Override local callbacks
-        playbackManager._playQueueManager = this.playQueueManager;
-
-        playbackManager.play = this.playRequest;
-        playbackManager.setCurrentPlaylistItem = this.setCurrentPlaylistItemRequest;
-        playbackManager.removeFromPlaylist = this.removeFromPlaylistRequest;
-        playbackManager.movePlaylistItem = this.movePlaylistItemRequest;
-        playbackManager.queue = this.queueRequest;
-        playbackManager.queueNext = this.queueNextRequest;
-
-        playbackManager.nextTrack = this.nextTrackRequest;
-        playbackManager.previousTrack = this.previousTrackRequest;
-
-        playbackManager.setRepeatMode = this.setRepeatModeRequest;
-        playbackManager.setQueueShuffleMode = this.setQueueShuffleModeRequest;
-        playbackManager.toggleQueueShuffleMode = this.toggleQueueShuffleModeRequest;
-    }
-
-    /**
-     * Restores original PlaybackManager's methods.
-     */
-    restorePlaybackManager() {
-        playbackManager._playQueueManager = playbackManager._localPlayQueueManager;
-
-        playbackManager.play = playbackManager._localPlay;
-        playbackManager.setCurrentPlaylistItem = playbackManager._localSetCurrentPlaylistItem;
-        playbackManager.removeFromPlaylist = playbackManager._localRemoveFromPlaylist;
-        playbackManager.movePlaylistItem = playbackManager._localMovePlaylistItem;
-        playbackManager.queue = playbackManager._localQueue;
-        playbackManager.queueNext = playbackManager._localQueueNext;
-
-        playbackManager.nextTrack = playbackManager._localNextTrack;
-        playbackManager.previousTrack = playbackManager._localPreviousTrack;
-
-        playbackManager.setRepeatMode = playbackManager._localSetRepeatMode;
-        playbackManager.setQueueShuffleMode = playbackManager._localSetQueueShuffleMode;
-        playbackManager.toggleQueueShuffleMode = playbackManager._localToggleQueueShuffleMode;
-
-        this.playQueueManager.onSyncPlayShutdown();
-    }
-
-    /**
-     * Overrides PlaybackManager's play method.
-     */
-    playRequest(options) {
-        if (!syncPlayManager.hasPlaylistAccess()) {
-            // TODO: show some feedback?
-            return;
-        }
-
-        const playerWrapper = syncPlayManager.getPlayerWrapper();
-        playerWrapper.playRequest(options);
-    }
-
-    /**
-     * Overrides PlaybackManager's setCurrentPlaylistItem method.
-     */
-    setCurrentPlaylistItemRequest(playlistItemId, player) {
-        if (!syncPlayManager.hasPlaybackAccess()) {
-            // TODO: show some feedback?
-            return;
-        }
-
-        const playerWrapper = syncPlayManager.getPlayerWrapper();
-        playerWrapper.setCurrentPlaylistItemRequest(playlistItemId, player);
-    }
-
-    /**
-     * Overrides PlaybackManager's removeFromPlaylist method.
-     */
-    removeFromPlaylistRequest(playlistItemIds, player) {
-        if (!syncPlayManager.hasPlaylistAccess()) {
-            // TODO: show some feedback?
-            return;
-        }
-
-        const playerWrapper = syncPlayManager.getPlayerWrapper();
-        playerWrapper.removeFromPlaylistRequest(playlistItemIds, player);
-    }
-
-    /**
-     * Overrides PlaybackManager's movePlaylistItem method.
-     */
-    movePlaylistItemRequest(playlistItemId, newIndex, player) {
-        if (!syncPlayManager.hasPlaylistAccess()) {
-            // TODO: show some feedback?
-            return;
-        }
-
-        const playerWrapper = syncPlayManager.getPlayerWrapper();
-        playerWrapper.movePlaylistItemRequest(playlistItemId, newIndex, player);
-    }
-
-    /**
-     * Overrides PlaybackManager's queue method.
-     */
-    queueRequest(options, player) {
-        if (!syncPlayManager.hasPlaylistAccess()) {
-            // TODO: show some feedback?
-            return;
-        }
-
-        const playerWrapper = syncPlayManager.getPlayerWrapper();
-        playerWrapper.queueRequest(options, player);
-    }
-
-    /**
-     * Overrides PlaybackManager's queueNext method.
-     */
-    queueNextRequest(options, player) {
-        if (!syncPlayManager.hasPlaylistAccess()) {
-            // TODO: show some feedback?
-            return;
-        }
-
-        const playerWrapper = syncPlayManager.getPlayerWrapper();
-        playerWrapper.queueNextRequest(options, player);
-    }
-
-    /**
-     * Overrides PlaybackManager's nextTrack method.
-     */
-    nextTrackRequest(player) {
-        if (!syncPlayManager.hasPlaybackAccess()) {
-            // TODO: show some feedback?
-            return;
-        }
-
-        const playerWrapper = syncPlayManager.getPlayerWrapper();
-        playerWrapper.nextTrackRequest(player);
-    }
-
-    /**
-     * Overrides PlaybackManager's previousTrack method.
-     */
-    previousTrackRequest(player) {
-        if (!syncPlayManager.hasPlaybackAccess()) {
-            // TODO: show some feedback?
-            return;
-        }
-
-        const playerWrapper = syncPlayManager.getPlayerWrapper();
-        playerWrapper.previousTrackRequest(player);
-    }
-
-    /**
-     * Overrides PlaybackManager's setRepeatMode method.
-     */
-    setRepeatModeRequest(mode, player) {
-        if (!syncPlayManager.hasPlaylistAccess()) {
-            // TODO: show some feedback?
-            return;
-        }
-
-        const playerWrapper = syncPlayManager.getPlayerWrapper();
-        playerWrapper.setRepeatModeRequest(mode, player);
-    }
-
-    /**
-     * Overrides PlaybackManager's setQueueShuffleMode method.
-     */
-    setQueueShuffleModeRequest(mode, player) {
-        if (!syncPlayManager.hasPlaylistAccess()) {
-            // TODO: show some feedback?
-            return;
-        }
-
-        const playerWrapper = syncPlayManager.getPlayerWrapper();
-        playerWrapper.setQueueShuffleModeRequest(mode, player);
-    }
-
-    /**
-     * Overrides PlaybackManager's toggleQueueShuffleMode method.
-     */
-    toggleQueueShuffleModeRequest(player) {
-        if (!syncPlayManager.hasPlaylistAccess()) {
-            // TODO: show some feedback?
-            return;
-        }
-
-        const playerWrapper = syncPlayManager.getPlayerWrapper();
-        playerWrapper.toggleQueueShuffleModeRequest(player);
-    }
-
-    /**
-     * Calls original PlaybackManager's play method.
-     */
-    localPlay(options) {
-        if (playbackManager.syncPlayEnabled) {
-            return playbackManager._localPlay(options);
-        } else {
-            return playbackManager.play(options);
-        }
-    }
-
-    /**
      * Calls original PlaybackManager's setCurrentPlaylistItem method.
      */
-    localSetCurrentPlaylistItem(playlistItemId, player) {
+    localSetCurrentPlaylistItem(playlistItemId) {
         // Ignore command when client is not following playback
-        if (!syncPlayManager.isFollowingGroupPlayback()) {
+        if (!this.manager.isFollowingGroupPlayback()) {
             console.debug('SyncPlay localSetCurrentPlaylistItem: ignoring, not following playback.');
             return;
         }
 
-        syncPlayManager.queueCore.scheduleReadyRequestOnPlaybackStart('localSetCurrentPlaylistItem');
+        this.manager.queueCore.scheduleReadyRequestOnPlaybackStart('localSetCurrentPlaylistItem');
 
-        if (playbackManager.syncPlayEnabled) {
-            return playbackManager._localSetCurrentPlaylistItem(playlistItemId, player);
-        } else {
-            return playbackManager.setCurrentPlaylistItem(playlistItemId, player);
-        }
-    }
-
-    /**
-     * Calls original PlaybackManager's removeFromPlaylist method.
-     */
-    localRemoveFromPlaylist(playlistItemIds, player) {
-        if (playbackManager.syncPlayEnabled) {
-            return playbackManager._localRemoveFromPlaylist(playlistItemIds, player);
-        } else {
-            return playbackManager.removeFromPlaylist(playlistItemIds, player);
-        }
-    }
-
-    /**
-     * Calls original PlaybackManager's movePlaylistItem method.
-     */
-    localMovePlaylistItem(playlistItemId, newIndex, player) {
-        if (playbackManager.syncPlayEnabled) {
-            return playbackManager._localMovePlaylistItem(playlistItemId, newIndex, player);
-        } else {
-            return playbackManager.movePlaylistItem(playlistItemId, newIndex, player);
-        }
-    }
-
-    /**
-     * Calls original PlaybackManager's queue method.
-     */
-    localQueue(options, player) {
-        if (playbackManager.syncPlayEnabled) {
-            return playbackManager._localQueue(options, player);
-        } else {
-            return playbackManager.queue(options, player);
-        }
-    }
-
-    /**
-     * Calls original PlaybackManager's queueNext method.
-     */
-    localQueueNext(options, player) {
-        if (playbackManager.syncPlayEnabled) {
-            return playbackManager._localQueueNext(options, player);
-        } else {
-            return playbackManager.queueNext(options, player);
-        }
-    }
-
-    /**
-     * Calls original PlaybackManager's nextTrack method.
-     */
-    localNextTrack(player) {
-        // Ignore command when client is not following playback
-        if (!syncPlayManager.isFollowingGroupPlayback()) {
-            console.debug('SyncPlay localSetCurrentPlaylistItem: ignoring, not following playback.');
-            return;
-        }
-
-        syncPlayManager.queueCore.scheduleReadyRequestOnPlaybackStart('localNextTrack');
-
-        if (playbackManager.syncPlayEnabled) {
-            playbackManager._localNextTrack(player);
-        } else {
-            playbackManager.nextTrack(player);
-        }
-    }
-
-    /**
-     * Calls original PlaybackManager's previousTrack method.
-     */
-    localPreviousTrack(player) {
-        // Ignore command when client is not following playback
-        if (!syncPlayManager.isFollowingGroupPlayback()) {
-            console.debug('SyncPlay localSetCurrentPlaylistItem: ignoring, not following playback.');
-            return;
-        }
-
-        syncPlayManager.queueCore.scheduleReadyRequestOnPlaybackStart('localPreviousTrack');
-
-        if (playbackManager.syncPlayEnabled) {
-            playbackManager._localPreviousTrack(player);
-        } else {
-            playbackManager.previousTrack(player);
-        }
-    }
-
-    /**
-     * Calls original PlaybackManager's setRepeatMode method.
-     */
-    localSetRepeatMode(value, player) {
-        if (playbackManager.syncPlayEnabled) {
-            playbackManager._localSetRepeatMode(value, player);
-        } else {
-            playbackManager.setRepeatMode(value, player);
-        }
-    }
-
-    /**
-     * Calls original PlaybackManager's setQueueShuffleMode method.
-     */
-    localSetQueueShuffleMode(value, player) {
-        if (playbackManager.syncPlayEnabled) {
-            playbackManager._localSetQueueShuffleMode(value, player);
-        } else {
-            playbackManager.setQueueShuffleMode(value, player);
-        }
-    }
-
-    /**
-     * Calls original PlaybackManager's toggleQueueShuffleMode method.
-     */
-    localToggleQueueShuffleMode(player) {
-        if (playbackManager.syncPlayEnabled) {
-            playbackManager._localToggleQueueShuffleMode(player);
-        } else {
-            playbackManager.toggleQueueShuffleMode(player);
-        }
+        const playerWrapper = this.manager.getPlayerWrapper();
+        return playerWrapper.localSetCurrentPlaylistItem(playlistItemId);
     }
 
     /**

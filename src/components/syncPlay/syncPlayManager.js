@@ -12,8 +12,6 @@ import SyncPlayWebRTCCore from './webRTC/core';
 import SyncPlayPlaybackCore from './syncPlayPlaybackCore';
 import SyncPlayQueueCore from './syncPlayQueueCore';
 
-const playbackManager = {};
-
 /**
  * Class that manages the SyncPlay feature.
  */
@@ -37,7 +35,8 @@ class SyncPlayManager {
         this.timeSyncCore = new TimeSyncCore(this.webRTCCore);
         this.playbackCore = new SyncPlayPlaybackCore(this);
         this.queueCore = new SyncPlayQueueCore(this);
-        this.defaultPlayerWrapper = syncPlayPlayerFactory.getGenericWrapper(this);
+        this.controller = new SyncPlayController(this);
+        this.playerWrapper = syncPlayPlayerFactory.getDefaultWrapper(this);
 
         // TODO: bind to player or player manager...
         // this.bindToPlayer();
@@ -83,11 +82,7 @@ class SyncPlayManager {
         this.playerWrapper = syncPlayPlayerFactory.getWrapper(player, this);
 
         if (this.isSyncPlayEnabled()) {
-            if (this.playerWrapper) {
-                this.playerWrapper.bindToPlayer();
-            } else {
-                console.warn('SyncPlay bindToPlayer: player is not supported!', player);
-            }
+            this.playerWrapper.bindToPlayer();
         }
 
         events.trigger(this, 'playerchange', [this.currentPlayer]);
@@ -98,10 +93,8 @@ class SyncPlayManager {
      */
     releaseCurrentPlayer() {
         this.currentPlayer = null;
-        if (this.playerWrapper !== null) {
-            this.playerWrapper.unbindFromPlayer();
-            this.playerWrapper = null;
-        }
+        this.playerWrapper.unbindFromPlayer();
+        this.playerWrapper = syncPlayPlayerFactory.getDefaultWrapper(this);
 
         events.trigger(this, 'playerchange', [this.currentPlayer]);
     }
@@ -198,6 +191,7 @@ class SyncPlayManager {
                 // TODO: show fancy list of joined users if idle.
                 break;
             case 'GroupJoined':
+                cmd.Data.LastUpdatedAt = new Date(cmd.Data.LastUpdatedAt);
                 this.enableSyncPlay(apiClient, cmd.Data, true);
                 break;
             case 'SyncPlayIsDisabled':
@@ -274,8 +268,8 @@ class SyncPlayManager {
 
         // Make sure command matches playing item in playlist
         const playlistItemId = this.queueCore.getCurrentPlaylistItemId();
-        if (cmd.PlaylistItemId !== playlistItemId) {
-            console.warn('SyncPlay processCommand: playlist item does not match!', cmd);
+        if (cmd.PlaylistItemId !== playlistItemId && cmd.Command !== 'Stop') {
+            console.error('SyncPlay processCommand: playlist item does not match!', cmd);
             return;
         }
 
@@ -355,15 +349,22 @@ class SyncPlayManager {
      * @param {boolean} showMessage Display message.
      */
     enableSyncPlay(apiClient, groupInfo, showMessage = false) {
-        // Convert string to date
-        groupInfo.LastUpdatedAt = new Date(groupInfo.LastUpdatedAt);
+        if (this.isSyncPlayEnabled()) {
+            if (groupInfo.GroupId === this.groupInfo.GroupId) {
+                console.debug(`SyncPlay enableSyncPlay: group ${this.groupInfo.GroupId} already joined.`);
+                return;
+            } else {
+                console.warn(`SyncPlay enableSyncPlay: switching from group ${this.groupInfo.GroupId} to group ${groupInfo.GroupId}.`);
+                this.disableSyncPlay(false);
+            }
+
+            showMessage = false;
+        }
+
         this.groupInfo = groupInfo;
 
         this.syncPlayEnabledAt = groupInfo.LastUpdatedAt;
-        this.injectPlaybackManager();
-        if (this.playerWrapper) {
-            this.playerWrapper.bindToPlayer();
-        }
+        this.playerWrapper.bindToPlayer();
 
         events.trigger(this, 'enabled', [true]);
 
@@ -398,11 +399,9 @@ class SyncPlayManager {
         this.lastPlaybackCommand = null;
         this.queuedCommand = null;
         this.playbackCore.syncEnabled = false;
+        this.queueCore.playQueueManager.onSyncPlayShutdown();
         events.trigger(this, 'enabled', [false]);
-        this.restorePlaybackManager();
-        if (this.playerWrapper) {
-            this.playerWrapper.unbindFromPlayer();
-        }
+        this.playerWrapper.unbindFromPlayer();
 
         this.webRTCCore.disable();
 
@@ -415,33 +414,6 @@ class SyncPlayManager {
      */
     isSyncPlayEnabled() {
         return this.syncPlayEnabledAt !== null;
-    }
-
-    /**
-     * Overrides some PlaybackManager's methods to intercept playback commands.
-     */
-    injectPlaybackManager() {
-        if (!this.isSyncPlayEnabled()) return;
-        if (playbackManager.syncPlayEnabled) return;
-
-        // TODO: make this less hacky
-        this.playbackCore.injectPlaybackManager();
-        this.queueCore.injectPlaybackManager();
-
-        playbackManager.syncPlayEnabled = true;
-    }
-
-    /**
-     * Restores original PlaybackManager's methods.
-     */
-    restorePlaybackManager() {
-        if (this.isSyncPlayEnabled()) return;
-        if (!playbackManager.syncPlayEnabled) return;
-
-        this.playbackCore.restorePlaybackManager();
-        this.queueCore.restorePlaybackManager();
-
-        playbackManager.syncPlayEnabled = false;
     }
 
     /**
@@ -464,12 +436,20 @@ class SyncPlayManager {
         };
     }
 
+    getPlaybackCore() {
+        return this.playbackCore;
+    }
+
+    getQueueCore() {
+        return this.queueCore;
+    }
+
+    getController() {
+        return this.controller;
+    }
+
     getPlayerWrapper() {
-        if (this.playerWrapper) {
-            return this.playerWrapper;
-        } else {
-            return this.defaultPlayerWrapper;
-        }
+        return this.playerWrapper;
     }
 
     /**
