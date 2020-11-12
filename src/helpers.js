@@ -1019,11 +1019,13 @@ export function broadcastToMessageBus(msg) {
     window.castReceiverContext.sendCustomMessage('urn:x-cast:com.connectsdk', window.senderId, msg);
 }
 
-export function broadcastConnectionErrorMessage() {
+export function broadcastConnectionErrorMessage(error) {
 
     broadcastToMessageBus({
         type: 'connectionerror',
-        message: ""
+        message: error.message,
+        stack: error.stack,
+        error: error
     });
 }
 

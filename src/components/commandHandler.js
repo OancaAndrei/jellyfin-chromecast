@@ -6,10 +6,9 @@ import {
     setSubtitleStreamIndex,
     seek
 } from "./maincontroller";
-
 import { getReportingParams } from "../helpers";
-
 import { factory as jellyfinActions } from "./jellyfinactions";
+// import syncPlayManager from 'SyncPlay/syncPlayManager';
 
 export class commandHandler {
     constructor(castContext, playerManager, playbackManager) {

@@ -30,8 +30,9 @@ export var factory = {};
 var pingInterval;
 var lastTranscoderPing = 0;
 
+// TODO: the web client does NOT have this Api call.
 function restartPingInterval($scope, reportingParams) {
-
+    // TODO: the web client does NOT have this Api call.
     stopPingInterval();
 
     if (reportingParams.PlayMethod == 'Transcode') {
@@ -43,6 +44,7 @@ function restartPingInterval($scope, reportingParams) {
     }
 }
 
+// TODO: the web client does NOT have this Api call.
 function stopPingInterval() {
 
     var current = pingInterval;
@@ -53,10 +55,12 @@ function stopPingInterval() {
     }
 }
 
+// TODO: the web client does NOT have this Api call.
 factory.stopPingInterval = function () {
     stopPingInterval();
 };
 
+// ApiClient.reportPlaybackStart(options)
 factory.reportPlaybackStart = function ($scope, options) {
 
     this.stopDynamicContent();
@@ -76,6 +80,7 @@ factory.reportPlaybackStart = function ($scope, options) {
         data: getSenderReportingData($scope, options)
     });
 
+    // TODO: the web client does NOT have this Api call.
     restartPingInterval($scope, options);
 
     return ajax({
@@ -88,6 +93,7 @@ factory.reportPlaybackStart = function ($scope, options) {
     });
 };
 
+// ApiClient.reportPlaybackProgress(options)
 factory.reportPlaybackProgress = function ($scope, options, reportToServer, broadcastEventName) {
 
     if (!$scope.userId) {
@@ -124,8 +130,9 @@ factory.reportPlaybackProgress = function ($scope, options, reportToServer, broa
     });
 };
 
+// ApiClient.reportPlaybackStopped(options)
 factory.reportPlaybackStopped = function ($scope, options) {
-
+    // TODO: the web client does NOT have this Api call.
     stopPingInterval();
 
     if (!$scope.userId) {
@@ -153,6 +160,7 @@ factory.reportPlaybackStopped = function ($scope, options) {
     });
 };
 
+// The web client does NOT have this Api call...
 factory.pingTranscoder = function ($scope, options) {
 
     if (!$scope.userId) {
@@ -363,6 +371,7 @@ factory.stop = function ($scope) {
     }, 20);
 };
 
+// ApiClient.getPlaybackInfo(itemId, options, deviceProfile)
 factory.getPlaybackInfo = function (item, maxBitrate, deviceProfile, startPosition, mediaSourceId, audioStreamIndex, subtitleStreamIndex, liveStreamId) {
 
     if (!item.userId) {
@@ -412,6 +421,7 @@ factory.getPlaybackInfo = function (item, maxBitrate, deviceProfile, startPositi
     });
 };
 
+// ? ApiClient.getLiveStreamMediaInfo(liveStreamId)
 factory.getLiveStream = function (item, playSessionId, maxBitrate, deviceProfile, startPosition, mediaSource, audioStreamIndex, subtitleStreamIndex) {
 
     if (!item.userId) {
@@ -458,6 +468,7 @@ factory.getLiveStream = function (item, playSessionId, maxBitrate, deviceProfile
     });
 };
 
+// ApiClient.getDownloadSpeed(byteSize)
 factory.getDownloadSpeed = function ($scope, byteSize) {
 
     if (!$scope.userId) {
@@ -490,6 +501,7 @@ factory.getDownloadSpeed = function ($scope, byteSize) {
     });
 };
 
+// ApiClient.detectBitrate(force)
 factory.detectBitrate = function ($scope) {
 
     // First try a small amount so that we don't hang up their mobile connection
@@ -509,6 +521,7 @@ factory.detectBitrate = function ($scope) {
     });
 };
 
+// ApiClient.stopActiveEncodings(playSessionId)
 factory.stopActiveEncodings = function ($scope) {
 
     var options = {

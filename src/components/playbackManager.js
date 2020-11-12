@@ -151,7 +151,7 @@ export class playbackManager {
         var mediaInfo = createMediaInformation(playSessionId, item, streamInfo);
         var loadRequestData = new cast.framework.messages.LoadRequestData();
         loadRequestData.media = mediaInfo;
-        loadRequestData.autoplay = true;
+        loadRequestData.autoplay = false; // placeholder.
 
         jellyfinActions.load($scope, mediaInfo.customData, item);
         this.playerManager.load(loadRequestData);
@@ -192,6 +192,7 @@ export class playbackManager {
 
         var promise;
 
+        // TODO: the web client does NOT have this Api call.
         jellyfinActions.stopPingInterval();
 
         if (reportingParams.ItemId) {

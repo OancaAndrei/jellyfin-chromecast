@@ -159,7 +159,7 @@ class SyncPlayGenericPlayer {
      * @param {number} value The playback rate.
      */
     setPlaybackRate(value) {
-        // Do nothing.
+        return Promise.reject();
     }
 
     /**
@@ -182,14 +182,14 @@ class SyncPlayGenericPlayer {
      * Unpauses the player.
      */
     localUnpause() {
-
+        return Promise.resolve();
     }
 
     /**
      * Pauses the player.
      */
     localPause() {
-
+        return Promise.resolve();
     }
 
     /**
@@ -197,14 +197,14 @@ class SyncPlayGenericPlayer {
      * @param {number} positionTicks The new position.
      */
     localSeek(positionTicks) {
-
+        return Promise.resolve();
     }
 
     /**
      * Stops the player.
      */
     localStop() {
-
+        return Promise.resolve();
     }
 
     /**
@@ -212,7 +212,7 @@ class SyncPlayGenericPlayer {
      * @param {Object} command The command.
      */
     localSendCommand(command) {
-
+        return Promise.resolve();
     }
 
     /**
@@ -220,7 +220,7 @@ class SyncPlayGenericPlayer {
      * @param {Object} options Playback data.
      */
     localPlay(options) {
-
+        return Promise.resolve();
     }
 
     /**
@@ -228,7 +228,7 @@ class SyncPlayGenericPlayer {
      * @param {string} playlistItemId The item to play.
      */
     localSetCurrentPlaylistItem(playlistItemId) {
-
+        return Promise.resolve();
     }
 
     /**
@@ -236,7 +236,7 @@ class SyncPlayGenericPlayer {
      * @param {Array} playlistItemIds The items to remove.
      */
     localRemoveFromPlaylist(playlistItemIds) {
-
+        return Promise.resolve();
     }
 
     /**
@@ -245,7 +245,7 @@ class SyncPlayGenericPlayer {
      * @param {number} newIndex The new position.
      */
     localMovePlaylistItem(playlistItemId, newIndex) {
-
+        return Promise.resolve();
     }
 
     /**
@@ -253,7 +253,7 @@ class SyncPlayGenericPlayer {
      * @param {Object} options Queue data.
      */
     localQueue(options) {
-
+        return Promise.resolve();
     }
 
     /**
@@ -261,21 +261,21 @@ class SyncPlayGenericPlayer {
      * @param {Object} options Queue data.
      */
     localQueueNext(options) {
-
+        return Promise.resolve();
     }
 
     /**
      * Picks next item in playlist.
      */
     localNextTrack() {
-
+        return Promise.resolve();
     }
 
     /**
      * Picks previous item in playlist.
      */
     localPreviousTrack() {
-
+        return Promise.resolve();
     }
 
     /**
@@ -283,7 +283,7 @@ class SyncPlayGenericPlayer {
      * @param {string} value The repeat mode.
      */
     localSetRepeatMode(value) {
-
+        return Promise.resolve();
     }
 
     /**
@@ -291,14 +291,14 @@ class SyncPlayGenericPlayer {
      * @param {string} value The shuffle mode.
      */
     localSetQueueShuffleMode(value) {
-
+        return Promise.resolve();
     }
 
     /**
      * Toggles shuffle mode.
      */
     localToggleQueueShuffleMode() {
-
+        return Promise.resolve();
     }
 }
 

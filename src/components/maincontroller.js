@@ -1,4 +1,4 @@
-/* eslint-disable */
+﻿/* eslint-disable */
 
 import { factory as jellyfinActions } from "./jellyfinactions";
 import { ajax } from "./fetchhelper";
@@ -25,7 +25,7 @@ import {
 
 import { commandHandler } from "./commandHandler";
 import { playbackManager } from "./playbackManager";
-import { createConnectionManager } from '../server/connection';
+import { forkSession } from '../server/connection';
 
 window.castReceiverContext = cast.framework.CastReceiverContext.getInstance();
 window.mediaManager = window.castReceiverContext.getPlayerManager();
@@ -60,13 +60,13 @@ export function onMediaElementTimeUpdate(e) {
 
     var now = new Date();
 
-    var elapsed = now - broadcastToServer;
+    var elapsed = now.getTime() - broadcastToServer.getTime();
 
     if (elapsed > 5000) {
         // TODO use status as input
         jellyfinActions.reportPlaybackProgress($scope, getReportingParams($scope));
         broadcastToServer = now;
-    } else if (elapsed > 1500) {
+    } else if (elapsed > 2500) {
         // TODO use status as input
         jellyfinActions.reportPlaybackProgress($scope, getReportingParams($scope), false);
     }
@@ -98,7 +98,12 @@ export function onMediaElementVolumeChange() {
     reportEvent('volumechange', true);
 }
 
+export function onMediaElementEvent(event) {
+    reportEvent(event.type, true);
+}
+
 export function enableTimeUpdateListener() {
+    // window.mediaManager.addEventListener(cast.framework.events.EventType.ALL, onMediaElementEvent);
     window.mediaManager.addEventListener(cast.framework.events.EventType.TIME_UPDATE, onMediaElementTimeUpdate);
     window.mediaManager.addEventListener(cast.framework.events.EventType.REQUEST_VOLUME_CHANGE, onMediaElementVolumeChange);
     window.mediaManager.addEventListener(cast.framework.events.EventType.PAUSE, onMediaElementPause);
@@ -106,6 +111,7 @@ export function enableTimeUpdateListener() {
 }
 
 export function disableTimeUpdateListener() {
+    // window.mediaManager.removeEventListener(cast.framework.events.EventType.ALL, onMediaElementEvent);
     window.mediaManager.removeEventListener(cast.framework.events.EventType.TIME_UPDATE, onMediaElementTimeUpdate);
     window.mediaManager.removeEventListener(cast.framework.events.EventType.REQUEST_VOLUME_CHANGE, onMediaElementVolumeChange);
     window.mediaManager.removeEventListener(cast.framework.events.EventType.PAUSE, onMediaElementPause);
@@ -200,6 +206,11 @@ function internalProcessMessage(data) {
 }
 
 export function newProcessMessage(data) {
+    // broadcastToMessageBus({
+    //     type: 'received_message',
+    //     message: data
+    // });
+
     if (data.forkSession) {
         const {
             serverAddress,
@@ -207,7 +218,7 @@ export function newProcessMessage(data) {
             parentAccessToken,
             receiverName
         } = data.forkSession;
-        createConnectionManager(serverAddress, parentAccessToken, parentDeviceId, receiverName);
+        forkSession(serverAddress, parentAccessToken, parentDeviceId, receiverName);
         return;
     } else if (!window.connectionManager) {
         broadcastToMessageBus({
@@ -390,7 +401,7 @@ export function changeStream(ticks, params) {
         const mediaInformation = createMediaInformation(playSessionId, item, streamInfo);
         const loadRequest = new cast.framework.messages.LoadRequestData();
         loadRequest.media = mediaInformation;
-        loadRequest.autoplay = true;
+        loadRequest.autoplay = false;
 
         // TODO something to do with HLS?
         const requiresStoppingTranscoding = false;

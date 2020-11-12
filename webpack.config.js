@@ -6,6 +6,11 @@ const webpack = require("webpack");
 let config = {
     context: path.resolve(__dirname, "src"),
     entry: "./app.js",
+    resolve: {
+        alias: {
+            'syncPlay': path.resolve(__dirname, "src/components/syncPlay/core")
+        }
+    },
     output: {
         filename: "bundle.js",
         path: path.resolve(__dirname, "dist"),

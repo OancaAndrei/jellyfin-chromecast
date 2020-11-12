@@ -8,8 +8,26 @@ import {
     broadcastToMessageBus,
     cleanName
 } from '../helpers';
+import syncPlay from 'syncPlay';
+import syncPlayLocalPlayer from './../components/syncPlay/ui/players/localPlayer';
 
-export function createConnectionManager(serverAddress, parentAccessToken, parentDeviceId, receiverName) {
+export function forkSession(serverAddress, parentAccessToken, parentDeviceId, receiverName) {
+    // Init connection manager.
+    if (!window.connectionManager) {
+        createConnectionManager(serverAddress, receiverName);
+    }
+
+    // Logout from old session.
+    window.connectionManager.logout();
+
+    // Disable SyncPlay.
+    syncPlay.Manager.disableSyncPlay();
+
+    // Fork caster session.
+    window.apiClient.forkSession(parentAccessToken, parentDeviceId);
+}
+
+function createConnectionManager(serverAddress, receiverName) {
     const cleanReceiverName = cleanName(receiverName || '');
 
     const appName = window.deviceInfo.appName;
@@ -48,8 +66,31 @@ export function createConnectionManager(serverAddress, parentAccessToken, parent
     // Register ApiClient.
     connectionManager.addApiClient(apiClient);
 
-    // Fork caster session.
-    apiClient.forkSession(parentAccessToken, parentDeviceId);
+    // Save globals.
+    window.apiClient = apiClient;
+    window.connectionManager = connectionManager;
+
+    try {
+        initSyncPlay(apiClient, deviceName);
+    } catch (error) {
+        broadcastToMessageBus({
+            type: 'error_message',
+            message: error.message,
+            stack: error.stack
+        });
+    }
+}
+
+function initSyncPlay(apiClient, deviceName) {
+    // Register player wrappers.
+    syncPlay.PlayerFactory.setDefaultWrapper(syncPlayLocalPlayer);
+
+    // Set default value for some settings.
+    syncPlay.Settings.set('webRTCDisplayName', deviceName);
+    syncPlay.Settings.set('minDelaySkipToSync', 60000.0);
+    syncPlay.Settings.set('useSpeedToSync', false);
+    syncPlay.Settings.set('useSkipToSync', true);
+    syncPlay.Settings.set('enableSyncCorrection', true);
 
     // Listen for messages.
     Events.on(apiClient, 'message', (event, message) => {
@@ -57,9 +98,24 @@ export function createConnectionManager(serverAddress, parentAccessToken, parent
             type: 'apiclient_message',
             message: message
         });
+
+        try {
+            if (message.MessageType === 'SyncPlayCommand') {
+                console.log('SyncPlay', message.Data);
+                syncPlay.Manager.processCommand(message.Data, apiClient);
+            } else if (message.MessageType === 'SyncPlayGroupUpdate') {
+                console.log('SyncPlay', message.Data);
+                syncPlay.Manager.processGroupUpdate(message.Data, apiClient);
+            }
+        } catch (error) {
+            broadcastToMessageBus({
+                type: 'error_message',
+                message: error.message,
+                stack: error.stack
+            });
+        }
     });
 
-    // Save globals.
-    window.apiClient = apiClient;
-    window.connectionManager = connectionManager;
+    // Start SyncPlay.
+    syncPlay.Manager.init(apiClient);
 }

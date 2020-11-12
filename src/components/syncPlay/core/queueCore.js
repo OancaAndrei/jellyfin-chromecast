@@ -69,9 +69,7 @@ class SyncPlayQueueCore {
                 case 'NextTrack':
                 case 'PreviousTrack': {
                     playerWrapper.onQueueUpdate();
-
-                    const playlistItemId = this.getCurrentPlaylistItemId();
-                    this.setCurrentPlaylistItem(apiClient, playlistItemId);
+                    this.onCurrentPlaylistItemChanged(apiClient);
                     break;
                 }
                 case 'RemoveItems': {
@@ -81,7 +79,7 @@ class SyncPlayQueueCore {
                     const oldPlaylistItemId = index === -1 ? null : previous.playlist[index].PlaylistItemId;
                     const playlistItemId = this.getCurrentPlaylistItemId();
                     if (oldPlaylistItemId !== playlistItemId) {
-                        this.setCurrentPlaylistItem(apiClient, playlistItemId);
+                        this.onCurrentPlaylistItemChanged(apiClient);
                     }
                     break;
                 }
@@ -166,17 +164,18 @@ class SyncPlayQueueCore {
      */
     scheduleReadyRequestOnPlaybackStart(apiClient, origin) {
         syncPlayHelper.waitForEventOnce(this.manager, 'playbackstart', syncPlayHelper.WaitForEventDefaultTimeout, ['playbackerror']).then(() => {
-            console.debug('SyncPlay scheduleReadyRequestOnPlaybackStart: local pause and notify server.');
+            console.debug('SyncPlay scheduleReadyRequestOnPlaybackStart: local pause.');
             const playerWrapper = this.manager.getPlayerWrapper();
-            playerWrapper.localPause();
-
+            return playerWrapper.localPause();
+        }).then(() => {
+            console.debug('SyncPlay scheduleReadyRequestOnPlaybackStart: notify server.');
             const currentTime = new Date();
             const now = this.manager.timeSyncCore.localDateToRemote(currentTime);
             const currentPosition = playerWrapper.currentTime();
             const currentPositionTicks = Math.round(currentPosition * syncPlayHelper.TicksPerMillisecond);
             const isPlaying = playerWrapper.isPlaying();
 
-            apiClient.requestSyncPlayBuffering({
+            return apiClient.requestSyncPlayBuffering({
                 When: now.toISOString(),
                 PositionTicks: currentPositionTicks,
                 IsPlaying: isPlaying,
@@ -240,11 +239,10 @@ class SyncPlayQueueCore {
     }
 
     /**
-     * Sets the current playing item.
+     * Plays the new item.
      * @param {Object} apiClient The ApiClient.
-     * @param {string} playlistItemId The playlist id of the item to play.
      */
-    setCurrentPlaylistItem(apiClient, playlistItemId) {
+    onCurrentPlaylistItemChanged(apiClient) {
         if (!this.manager.isFollowingGroupPlayback()) {
             console.debug('SyncPlay setCurrentPlaylistItem: ignoring, not following playback.');
             return;
@@ -252,8 +250,11 @@ class SyncPlayQueueCore {
 
         this.scheduleReadyRequestOnPlaybackStart(apiClient, 'setCurrentPlaylistItem');
 
+        const playlistItemId = this.getCurrentPlaylistItemId();
+        const item = this.playlist[this.getCurrentPlaylistIndex()];
+
         const playerWrapper = this.manager.getPlayerWrapper();
-        playerWrapper.localSetCurrentPlaylistItem(playlistItemId);
+        playerWrapper.localSetCurrentPlaylistItem(playlistItemId, item);
     }
 
     /**
